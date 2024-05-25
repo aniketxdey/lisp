@@ -5,6 +5,7 @@
 Ongoing research currently being conducted under advisory of Professor Peter Chin at LISP Machine Learning Lab. 
 
 ## 1) An Attack to Reveal Voice Samples in Distributed Speech Recognition Models 
+![Wetterhahn Science Symposium (1)](https://github.com/aniketxdey/lisp/assets/168318141/f18d3f1e-ea69-4671-8697-3675f63843e1)
 [Wetterhahn Science Symposium (1).pdf](https://github.com/aniketxdey/lisp/files/15441960/Wetterhahn.Science.Symposium.1.pdf)
 
 ## 2) Mamba: Selective SSMs & Introducing Embedding Search
