@@ -6,9 +6,9 @@ Research conducted under advisory of Professor Peter Chin at LISP Machine Learni
 
 ## Codebase Guide:
 1. `asr-model-attack` - An Attack to Reveal Voice Samples in Distributed Speech Recognition Models
-    a. Algorithms & training available in `/src/notebooks`
+    - Algorithms & training available in `/src/notebooks`
 2. `mamba-ESI` - Mamba-ESI: Introducing Embedding Search to Selective SSMs
-    a. Architecture & code available in `/mamba_ssm/mixer_seq_simple.py`
+    - Architecture & code available in `/mamba_ssm/mixer_seq_simple.py`
 
 ## An Attack to Reveal Voice Samples in Distributed Speech Recognition Models
 #### Peter Chin (Advisor), Minh Bui (PI), Paul Cherian, Mary Wood, Aniket Dey
