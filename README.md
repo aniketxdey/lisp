@@ -4,6 +4,12 @@
 
 Research conducted under advisory of Professor Peter Chin at LISP Machine Learning Lab. 
 
+## Codebase Guide:
+1. `asr-model-attack` - An Attack to Reveal Voice Samples in Distributed Speech Recognition Models
+    a. Algorithms & training available in `/src/notebooks`
+2. `mamba-ESI` - Mamba-ESI: Introducing Embedding Search to Selective SSMs
+    a. Architecture & code available in `/mamba_ssm/mixer_seq_simple.py`
+
 ## An Attack to Reveal Voice Samples in Distributed Speech Recognition Models
 #### Peter Chin (Advisor), Minh Bui (PI), Paul Cherian, Mary Wood, Aniket Dey
 
@@ -22,6 +28,9 @@ Sequence modeling has made significant strides with the advent of powerful archi
 
 ### Mamba ESI Benchmark Performance:
 <img width="691" alt="Screenshot 2024-11-07 at 5 34 48 PM" src="https://github.com/user-attachments/assets/ee3c52d9-6c0d-4fa2-9c22-7b77aaafad74">
+
+### Project README.md
+[mambaESI README.md](https://github.com/user-attachments/files/17670232/mambaESI.-.aniket.dey.abhinav.reddy.pdf)
 
 ### Project Presentation to LISP Lab Postdocs:
 

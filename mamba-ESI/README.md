@@ -1,15 +1,18 @@
-# Mamba
+# Mamba-ESI: Introducing Embedding Search to Selective SSMs
 
 ![Mamba](assets/selection.png "Selective State Space")
-> **Mamba: Linear-Time Sequence Modeling with Selective State Spaces**\
-> Albert Gu*, Tri Dao*\
-> Paper: https://arxiv.org/abs/2312.00752
+> **Mamba-ESI: Introducing Embedding Search to Selective SSMs**\
+> Peter Chin (Advisor), Yu-Wing Tai (Advisor), Abhinav Reddy, Aniket Dey\
+> *Based on the original Mamba architecture by Albert Gu*, Tri Dao*\
+> Original Paper: https://arxiv.org/abs/2312.00752
 
 ## About
 
-Mamba is a new state space model architecture showing promising performance on information-dense data such as language modeling, where previous subquadratic models fall short of Transformers.
-It is based on the line of progress on [structured state space models](https://github.com/state-spaces/s4),
-with an efficient hardware-aware design and implementation in the spirit of [FlashAttention](https://github.com/Dao-AILab/flash-attention).
+Mamba-ESI extends the Mamba sequence model architecture with an embedding search and injection (ESI) mechanism to efficiently handle long input sequences, such as entire textbooks. While the original Mamba showed promising performance on information-dense data like language modeling, efficiently capturing and utilizing relevant information from distant parts of very long sequences remained challenging.
+
+Mamba-ESI addresses this by introducing a dynamic attention mechanism that computes embeddings for questions and input tokens, performs similarity search to identify the most relevant tokens, and injects their corresponding hidden states into the current model state. This approach enables the model to selectively amplify pertinent information without storing and processing the entire memory tensor, effectively performing a kernel trick on the fly.
+
+The architecture is built upon the original Mamba's efficient hardware-aware design and selective state space model foundation, with significant memory and computational efficiency improvements for long-sequence tasks like textbook question answering.
 
 ## Installation
 
@@ -28,22 +31,22 @@ Other requirements:
 
 ## Usage
 
-We expose several levels of interface with the Mamba model.
+We expose several levels of interface with the Mamba-ESI model.
 
 ### Selective SSM
 
-Mamba is based on a selective SSM layer, which is the focus of the paper (Section 3; Algorithm 2).
+Mamba-ESI is based on the original selective SSM layer from Mamba (Section 3; Algorithm 2 of the original paper).
 
 Source: [ops/selective_scan_interface.py](mamba_ssm/ops/selective_scan_interface.py).
 
 ### Mamba Block
 
-The main module of this repository is the Mamba architecture block wrapping the selective SSM.
+The core Mamba architecture block wrapping the selective SSM remains unchanged.
 
 Source: [modules/mamba_simple.py](mamba_ssm/modules/mamba_simple.py).
 
 Usage:
-```
+```python
 import torch
 from mamba_ssm import Mamba
 
@@ -60,28 +63,50 @@ y = model(x)
 assert y.shape == x.shape
 ```
 
-### Mamba Language Model
+### Mamba-ESI Language Model
 
-Finally, we provide an example of a complete language model: a deep sequence model backbone (with repeating Mamba blocks) + language model head.
+The key innovation in Mamba-ESI is the enhanced language model that incorporates embedding search and injection for question-aware processing of long sequences.
 
 Source: [models/mixer_seq_simple.py](mamba_ssm/models/mixer_seq_simple.py).
 
-This is an example of how to integrate Mamba into an end-to-end neural network.
-This example is used in the generation scripts below.
+Usage:
+```python
+import torch
+from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
 
+# Load the model
+model = MambaLMHeadModel.from_pretrained("state-spaces/mamba-130m")
 
+# Example for question answering on long sequences
+input_ids = torch.randint(1, 1000, (1, 2048)).to("cuda")  # Long sequence
+question_ids = torch.randint(1, 1000, (1, 20)).to("cuda")  # Question tokens
+
+# Forward pass with embedding search and injection
+output = model(input_ids, question_ids)
+logits = output.logits
+```
+
+#### Embedding Search and Injection Mechanism
+
+The ESI mechanism works by:
+1. Computing question embeddings from question tokens
+2. Projecting input token embeddings to the same space
+3. Computing similarity scores between question and input embeddings
+4. Selecting top-k most relevant tokens based on similarity
+5. Injecting relevant hidden states into the current model state
+
+This enables dynamic attention to pertinent information across very long sequences without the quadratic memory requirements of traditional attention mechanisms.
 
 ## Pretrained Models
 
-Pretrained models are uploaded to
+Mamba-ESI is compatible with the original Mamba pretrained models available on
 [Hugging Face](https://huggingface.co/state-spaces): `mamba-130m`, `mamba-370m`,
 `mamba-790m`, `mamba-1.4b`, `mamba-2.8b`, trained on 300B tokens on the Pile, as well as `mamba-2.8b-slimpj`
 (trained on 600B tokens on the SlimPajama dataset).
 
-
 The models will be autodownloaded by the generation script below.
 
-These models were trained on the [Pile](https://huggingface.co/datasets/EleutherAI/pile), and follow the standard model dimensions described by GPT-3 and followed by many open source models:
+These models follow the standard model dimensions described by GPT-3:
 
 | Parameters | Layers | Model dim. | 
 |------------|--------|------------|
@@ -91,16 +116,11 @@ These models were trained on the [Pile](https://huggingface.co/datasets/Eleuther
 | 1.4B       | 48     | 2048       |
 | 2.8B       | 64     | 2560       |
 
-(The layer count of Mamba doubles that of a Transformer with similar size, as two Mamba blocks are needed for each "layer" (MHA block + MLP block) of a Transformer.)
-
-Note: these are base models trained only for 300B tokens, without any form of downstream modification (instruction tuning, etc.).
-Performance is expected to be comparable or better than other architectures trained on similar data, but not to match larger or fine-tuned models.
-
+Note: The ESI mechanism adds minimal parameters (embedding projection and injection layers) to the original architecture.
 
 ## Evaluations
 
-To run zero-shot evaluations of models (corresponding to Table 3 of the paper),
-we use the
+To run zero-shot evaluations of models, we use the
 [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness/tree/big-refactor)
 library.
 
@@ -114,13 +134,7 @@ python evals/lm_harness_eval.py --model mamba --model_args pretrained=state-spac
 python evals/lm_harness_eval.py --model hf --model_args pretrained=EleutherAI/pythia-160m --tasks lambada_openai,hellaswag,piqa,arc_easy,arc_challenge,winogrande --device cuda --batch_size 64
 ```
 
-To reproduce the results on the `mamba-2.8b-slimpj` model reported in the blogposts:
-```
-python evals/lm_harness_eval.py --model mamba --model_args pretrained=state-spaces/mamba-2.8b-slimpj --tasks boolq,piqa,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,race,truthfulqa_mc2 --device cuda --batch_size 64
-python evals/lm_harness_eval.py --model mamba --model_args pretrained=state-spaces/mamba-2.8b-slimpj --tasks mmlu --num_fewshot 5 --device cuda --batch_size 64
-```
-
-Note that the result of each task might differ from reported values by 0.1-0.3 due to noise in the evaluation process.
+For long-sequence tasks and question answering evaluations, Mamba-ESI demonstrates competitive performance while maintaining significant memory and computational efficiency compared to state-of-the-art methods.
 
 ## Inference
 
@@ -129,45 +143,35 @@ The script [benchmarks/benchmark_generation_mamba_simple.py](benchmarks/benchmar
 2. generates completions of a user-specified prompt,
 3. benchmarks the inference speed of this generation.
 
-Other configurable options include the top-p (nucleus sampling) probability, and the softmax temperature.
-
 ### Examples
 
-To test generation latency (e.g. batch size = 1) with different sampling strategies:
+To test generation latency with Mamba-ESI:
 
 ```
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba-2.8b" --prompt "My cat wrote all this CUDA code for a new language model and" --topp 0.9 --temperature 0.7 --repetition-penalty 1.2
-python benchmarks/benchmark_generation_mamba_simple.py --model-name "EleutherAI/pythia-2.8b" --prompt "My cat wrote all this CUDA code for a new language model and" --topp 0.9 --temperature 0.7 --repetition-penalty 1.2
-python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba-2.8b" --prompt "My cat wrote all this CUDA code for a new language model and" --minp 0.05 --topk 0 --temperature 0.7 --repetition-penalty 1.2
 ```
 
-To test generation throughput with random prompts (e.g. large batch size):
+To test generation throughput with random prompts:
 ```
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba-2.8b" --batch 128
-python benchmarks/benchmark_generation_mamba_simple.py --model-name "EleutherAI/pythia-2.8b" --batch 128
 ```
-
 
 ## Troubleshooting
 
 ### Precision
 Our models were trained using PyTorch [AMP](https://pytorch.org/docs/stable/amp.html) for mixed precision. AMP keeps model parameters in float32 and casts to half precision when necessary.
-On the other hand, other frameworks like DeepSpeed store parameters in float16 and upcasts when necessary (e.g. for optimizer accumulation).
 
 We've observed that higher precision for the main model parameters may be necessary, because SSMs are sensitive to their recurrent dynamics. If you are experiencing instabilities,
 as a first step please try a framework storing parameters in fp32 (such as AMP).
 
 ### Initialization
 Some parts of the model have initializations inherited from prior work on S4 models.
-For [example](https://github.com/state-spaces/mamba/blob/f0affcf69f06d1d06cef018ff640bf080a11c421/mamba_ssm/modules/mamba_simple.py#L102), the $\Delta$ parameter has a targeted range by initializing the bias of its linear projection.
-However, some frameworks may have post-initialization hooks (e.g. setting all bias terms in `nn.Linear` modules to zero).
-If this is the case, you may have to add custom logic (e.g. this [line](https://github.com/state-spaces/mamba/blob/f0affcf69f06d1d06cef018ff640bf080a11c421/mamba_ssm/modules/mamba_simple.py#L104) turns off re-initializing in our trainer, but would be a no-op in any other framework)
-that is specific to the training framework.
-
+The ESI mechanism uses standard Xavier initialization for the embedding projection and injection layers.
 
 ## Citation
 
-If you use this codebase, or otherwise found our work valuable, please cite Mamba:
+If you use this codebase, please cite original Mamba work:
+
 ```
 @article{mamba,
   title={Mamba: Linear-Time Sequence Modeling with Selective State Spaces},
@@ -175,4 +179,3 @@ If you use this codebase, or otherwise found our work valuable, please cite Mamb
   journal={arXiv preprint arXiv:2312.00752},
   year={2023}
 }
-```

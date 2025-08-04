@@ -1,10 +1,10 @@
-# Copyright (c) 2023, Albert Gu, Tri Dao.
+# Copyright (c) 2023, Tri Dao, Albert Gu.
 
 import math
-from functools import partial
-import json
 import os
-
+import json
+from functools import partial
+from typing import Optional
 from collections import namedtuple
 
 import torch
@@ -154,13 +154,14 @@ class MixerModel(nn.Module):
         hidden_states = self.embedding(input_ids)
         # Embedding search and injection
         input_embeddings = self.embedding_proj(hidden_states)
-        similarity_scores = torch.einsum('bd,td->bt', question_embedding, input_embeddings)
+        similarity_scores = torch.einsum('bd,btd->bt', question_embedding, input_embeddings)
         top_k = min(similarity_scores.size(-1), 5)  # Select top-k relevant tokens
         _, top_indices = torch.topk(similarity_scores, top_k, dim=-1)
         relevant_hidden_states = hidden_states.gather(1,
                                                       top_indices.unsqueeze(-1).expand(-1, -1, hidden_states.size(-1)))
         injection_vectors = self.injection_proj(relevant_hidden_states)
-        hidden_states = hidden_states + injection_vectors.sum(1)
+        aggregated_injection = injection_vectors.sum(1).unsqueeze(1)  # Sum over top-k, then add seq dim
+        hidden_states = hidden_states + aggregated_injection
 
         residual = None
         for layer in self.layers:
